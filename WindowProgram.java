@@ -1,6 +1,10 @@
 import se.miun.distsys.GroupCommuncation;
 import se.miun.distsys.listeners.ChatMessageListener;
+import se.miun.distsys.listeners.JoinMessageListener;
+import se.miun.distsys.listeners.LeaveMessageListener;
 import se.miun.distsys.messages.ChatMessage;
+import se.miun.distsys.messages.JoinMessage;
+import se.miun.distsys.messages.LeaveMessage;
 
 import java.awt.EventQueue;
 import java.awt.GridLayout;
@@ -12,7 +16,7 @@ import javax.swing.JFrame;
 import javax.swing.JButton;
 import javax.swing.JTextPane;
 import javax.swing.JScrollPane;
-public class WindowProgram implements ChatMessageListener, ActionListener {
+public class WindowProgram implements ActionListener, JoinMessageListener, LeaveMessageListener, ChatMessageListener {
 
 	JFrame frame;
 	JTextPane txtpnChat = new JTextPane();
@@ -36,9 +40,14 @@ public class WindowProgram implements ChatMessageListener, ActionListener {
 	public WindowProgram() {
 		initializeFrame();
 		gc = new GroupCommuncation();	
+
 		gc.setChatMessageListener(this);
+		gc.setJoinMessageListener(this);
+		gc.setLeaveMessageListener(this);
+
 		System.out.println("Group Communcation Started");
-		System.out.println("Sending join message");
+		System.out.println("Sending Join Message");
+		gc.sendJoinMessage();
 	}
 
 	private void initializeFrame() {
@@ -63,9 +72,9 @@ public class WindowProgram implements ChatMessageListener, ActionListener {
 		btnSendChatMessage.setActionCommand("send");
 		
 		frame.getContentPane().add(btnSendChatMessage);
-		
 		frame.addWindowListener(new java.awt.event.WindowAdapter() {
 	        public void windowClosing(WindowEvent winEvt) {
+				gc.sendLeaveMessage();
 	            gc.shutdown();
 	        }
 	    });
@@ -81,5 +90,15 @@ public class WindowProgram implements ChatMessageListener, ActionListener {
 	@Override
 	public void onIncomingChatMessage(ChatMessage chatMessage) {	
 		txtpnChat.setText(chatMessage.chat + "\n" + txtpnChat.getText());				
+	}
+
+	@Override
+	public void onIncomingJoinMessage(JoinMessage chatMessage) {	
+		txtpnChat.setText("Someone Joined" + "\n" + txtpnChat.getText());				
+	}
+
+	@Override
+	public void onIncomingLeaveMessage(LeaveMessage chatMessage) {	
+		txtpnChat.setText("Someone Left" + "\n" + txtpnChat.getText());				
 	}
 }

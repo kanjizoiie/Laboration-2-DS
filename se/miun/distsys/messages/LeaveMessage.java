@@ -4,7 +4,7 @@ public class LeaveMessage extends Message {
 
 	public String chat = "";	
 	
-	public JoinMessage(String chat) {
+	public LeaveMessage(String chat) {
 		this.chat = chat;
 	}
 }
