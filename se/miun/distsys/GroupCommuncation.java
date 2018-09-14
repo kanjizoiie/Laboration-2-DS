@@ -1,5 +1,9 @@
 package se.miun.distsys;
 
+import java.util.HashSet;
+import java.util.Random;
+import java.util.Set;
+
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
@@ -17,18 +21,25 @@ import se.miun.distsys.messages.Message;
 import se.miun.distsys.messages.MessageSerializer;
 
 public class GroupCommuncation {
-	private int datagramSocketPort = 1885; //You need to change this!		
+
+	Set<Integer> clientList = new HashSet<Integer>();
+
+	// members
+	private int datagramSocketPort = 1885;
+	private int id = 0;
 	DatagramSocket datagramSocket = null;	
 	boolean runGroupCommuncation = true;	
+
+	// serializer
 	MessageSerializer messageSerializer = new MessageSerializer();
 	
-	//Listeners
+	// listeners
 	ChatMessageListener chatMessageListener = null;
 	LeaveMessageListener leaveMessageListener = null;
 	JoinMessageListener joinMessageListener = null;
 
 	public GroupCommuncation() {
-
+		id = new Random().nextInt(5000);
 		try {
 			runGroupCommuncation = true;				
 			datagramSocket = new MulticastSocket(datagramSocketPort);		
@@ -38,6 +49,14 @@ public class GroupCommuncation {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+	}
+
+	/**
+	 * get the id of the group communication service.
+	 * @return the id of the group communication service.
+	 */
+	public int getId() {
+		return id;
 	}
 
 	public void shutdown() {
@@ -65,19 +84,23 @@ public class GroupCommuncation {
 		private void handleMessage(Message message) {
 			if(message instanceof ChatMessage) {				
 				ChatMessage chatMessage = (ChatMessage) message;				
-				if(chatMessageListener != null){
+				if(chatMessageListener != null) {
 					chatMessageListener.onIncomingChatMessage(chatMessage);
 				}
 			} 
 			else if (message instanceof JoinMessage) {
 				JoinMessage joinMessage = (JoinMessage) message;				
-				if(joinMessageListener != null){
+				if(joinMessageListener != null) {
+					clientList.add(joinMessage.id);
+					System.out.println(clientList.size());
 					joinMessageListener.onIncomingJoinMessage(joinMessage);
 				}
 			}
 			else if (message instanceof LeaveMessage) {
 				LeaveMessage leaveMessage = (LeaveMessage) message;				
-				if(leaveMessageListener != null){
+				if(leaveMessageListener != null) {
+					clientList.remove(leaveMessage.id); 
+					System.out.println(clientList.size());
 					leaveMessageListener.onIncomingLeaveMessage(leaveMessage);
 				}
 			}
@@ -87,7 +110,7 @@ public class GroupCommuncation {
 		}		
 	}	
 	
-	public void sendChatMessage(int id, String chat) {
+	public void sendChatMessage(String chat) {
 		try {
 			ChatMessage chatMessage = new ChatMessage(id, chat);
 			byte[] sendData = messageSerializer.serializeMessage(chatMessage);
@@ -98,7 +121,7 @@ public class GroupCommuncation {
 		}
 	}
 
-	public void sendJoinMessage(int id) {
+	public void sendJoinMessage() {
 		try {
 			JoinMessage joinMessage = new JoinMessage(id);
 			byte[] sendData = messageSerializer.serializeMessage(joinMessage);
@@ -109,7 +132,7 @@ public class GroupCommuncation {
 		}
 	}
 
-	public void sendLeaveMessage(int id) {
+	public void sendLeaveMessage() {
 		try {
 			LeaveMessage leaveMessage = new LeaveMessage(id);
 			byte[] sendData = messageSerializer.serializeMessage(leaveMessage);

@@ -11,7 +11,8 @@ import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.WindowEvent;
-import java.util.Random;
+
+
 
 import javax.swing.JFrame;
 import javax.swing.JButton;
@@ -20,6 +21,7 @@ import javax.swing.JScrollPane;
 import javax.swing.JList;
 public class WindowProgram implements ActionListener, JoinMessageListener, LeaveMessageListener, ChatMessageListener {
 
+	// the main function, this is what is ran on startup.
 	public static void main(String[] args) {
 		EventQueue.invokeLater(new Runnable() {
 			public void run() {
@@ -49,12 +51,12 @@ public class WindowProgram implements ActionListener, JoinMessageListener, Leave
 		gc.setChatMessageListener(this);
 		gc.setJoinMessageListener(this);
 		gc.setLeaveMessageListener(this);
-
-		id = new Random().nextInt(5000);
+		frame.setTitle(Integer.toString(gc.getId()));
 
 		System.out.println("Group Communcation Started");
-		System.out.println("Sending Join Message");
-		gc.sendJoinMessage(id);
+
+		// send a join message to all other clients.
+		gc.sendJoinMessage();
 	}
 
 	private void initializeFrame() {
@@ -80,34 +82,42 @@ public class WindowProgram implements ActionListener, JoinMessageListener, Leave
 		frame.getContentPane().add(btnSendChatMessage);
 		frame.addWindowListener(new java.awt.event.WindowAdapter() {
 	        public void windowClosing(WindowEvent winEvt) {
-				gc.sendLeaveMessage(id);
+				gc.sendLeaveMessage();
 	            gc.shutdown();
 	        }
 	    });
 	}
 
+	// button event function
 	@Override
 	public void actionPerformed(ActionEvent event) {
 		if (event.getActionCommand().equalsIgnoreCase("send")) {
 			if (txtpnMessage.getText().length() > 0) {
-				gc.sendChatMessage(id, txtpnMessage.getText());
+				gc.sendChatMessage(txtpnMessage.getText());
 				txtpnMessage.setText("");
 			}
 		}		
 	}
 	
+	// on incoming chat message event function
 	@Override
 	public void onIncomingChatMessage(ChatMessage chatMessage) {	
-		txtpnChat.setText(chatMessage.id + ":" + chatMessage.chat + "\n" + txtpnChat.getText());				
+		txtpnChat.setText(chatMessage.id + ": " + chatMessage.chat + "\n" + txtpnChat.getText());				
+	}
+	
+	// on incoming join message event function
+	@Override
+	public void onIncomingJoinMessage(JoinMessage joinMessage) {
+		if (joinMessage.id != id) {
+			txtpnChat.setText(joinMessage.id + " joined." + "\n" + txtpnChat.getText());	
+		}	
 	}
 
+	// on incoming leave message event function
 	@Override
-	public void onIncomingJoinMessage(JoinMessage joinMessage) {	
-		txtpnChat.setText(joinMessage.id + " joined." + "\n" + txtpnChat.getText());				
-	}
-
-	@Override
-	public void onIncomingLeaveMessage(LeaveMessage leaveMessage) {	
-		txtpnChat.setText(leaveMessage.id + " left." + "\n" + txtpnChat.getText());			
+	public void onIncomingLeaveMessage(LeaveMessage leaveMessage) {
+		if (leaveMessage.id != id) {
+			txtpnChat.setText(leaveMessage.id + " left." + "\n" + txtpnChat.getText());	
+		}	
 	}
 }
