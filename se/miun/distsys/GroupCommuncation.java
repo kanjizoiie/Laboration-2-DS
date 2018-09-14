@@ -27,7 +27,8 @@ public class GroupCommuncation {
 	LeaveMessageListener leaveMessageListener = null;
 	JoinMessageListener joinMessageListener = null;
 
-	public GroupCommuncation() {			
+	public GroupCommuncation() {
+
 		try {
 			runGroupCommuncation = true;				
 			datagramSocket = new MulticastSocket(datagramSocketPort);		
@@ -86,9 +87,9 @@ public class GroupCommuncation {
 		}		
 	}	
 	
-	public void sendChatMessage(String chat) {
+	public void sendChatMessage(int id, String chat) {
 		try {
-			ChatMessage chatMessage = new ChatMessage(chat);
+			ChatMessage chatMessage = new ChatMessage(id, chat);
 			byte[] sendData = messageSerializer.serializeMessage(chatMessage);
 			DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, InetAddress.getByName("255.255.255.255"), datagramSocketPort);
 			datagramSocket.send(sendPacket);
@@ -97,9 +98,9 @@ public class GroupCommuncation {
 		}
 	}
 
-	public void sendJoinMessage() {
+	public void sendJoinMessage(int id) {
 		try {
-			JoinMessage joinMessage = new JoinMessage("");
+			JoinMessage joinMessage = new JoinMessage(id);
 			byte[] sendData = messageSerializer.serializeMessage(joinMessage);
 			DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, InetAddress.getByName("255.255.255.255"), datagramSocketPort);
 			datagramSocket.send(sendPacket);
@@ -108,9 +109,9 @@ public class GroupCommuncation {
 		}
 	}
 
-	public void sendLeaveMessage() {
+	public void sendLeaveMessage(int id) {
 		try {
-			LeaveMessage leaveMessage = new LeaveMessage("chat");
+			LeaveMessage leaveMessage = new LeaveMessage(id);
 			byte[] sendData = messageSerializer.serializeMessage(leaveMessage);
 			DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, InetAddress.getByName("255.255.255.255"), datagramSocketPort);
 			datagramSocket.send(sendPacket);

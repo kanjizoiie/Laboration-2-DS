@@ -2,9 +2,9 @@ package se.miun.distsys.messages;
 
 public class LeaveMessage extends Message {
 
-	public String chat = "";	
+	public int id = 0;	
 	
-	public LeaveMessage(String chat) {
-		this.chat = chat;
+	public LeaveMessage(int id) {
+		this.id = id;
 	}
 }

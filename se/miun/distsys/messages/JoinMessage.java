@@ -2,9 +2,9 @@ package se.miun.distsys.messages;
 
 public class JoinMessage extends Message {
 
-	public String chat = "";	
+	public int id = 0;
 	
-	public JoinMessage(String chat) {
-		this.chat = chat;
+	public JoinMessage(int id) {
+		this.id = id;
 	}
 }
