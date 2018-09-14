@@ -1,22 +1,17 @@
-import java.awt.EventQueue;
-
-import javax.swing.JFrame;
-
 import se.miun.distsys.GroupCommuncation;
 import se.miun.distsys.listeners.ChatMessageListener;
 import se.miun.distsys.messages.ChatMessage;
 
-import javax.swing.JButton;
-import javax.swing.JTextPane;
+import java.awt.EventQueue;
 import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.WindowEvent;
 
+import javax.swing.JFrame;
+import javax.swing.JButton;
+import javax.swing.JTextPane;
 import javax.swing.JScrollPane;
-
-//Skeleton code for Distributed systems 9hp, DT050A
-
 public class WindowProgram implements ChatMessageListener, ActionListener {
 
 	JFrame frame;
@@ -40,14 +35,16 @@ public class WindowProgram implements ChatMessageListener, ActionListener {
 
 	public WindowProgram() {
 		initializeFrame();
-
-		gc = new GroupCommuncation();		
+		gc = new GroupCommuncation();	
 		gc.setChatMessageListener(this);
 		System.out.println("Group Communcation Started");
+		System.out.println("Sending join message");
 	}
 
 	private void initializeFrame() {
+		// create frame for the window
 		frame = new JFrame();
+
 		frame.setBounds(100, 100, 450, 300);
 		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		frame.getContentPane().setLayout(new GridLayout(0, 1, 0, 0));
