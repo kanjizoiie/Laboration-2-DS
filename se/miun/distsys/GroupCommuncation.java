@@ -1,9 +1,7 @@
 package se.miun.distsys;
 
-import java.util.HashSet;
 import java.util.Random;
 import java.util.Set;
-
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
@@ -12,20 +10,18 @@ import java.net.MulticastSocket;
 import se.miun.distsys.listeners.ChatMessageListener;
 import se.miun.distsys.listeners.JoinMessageListener;
 import se.miun.distsys.listeners.LeaveMessageListener;
-
+import se.miun.distsys.listeners.ListMessageListener;
 import se.miun.distsys.messages.ChatMessage;
 import se.miun.distsys.messages.JoinMessage;
 import se.miun.distsys.messages.LeaveMessage;
-
+import se.miun.distsys.messages.ListMessage;
 import se.miun.distsys.messages.Message;
 import se.miun.distsys.messages.MessageSerializer;
 
 public class GroupCommuncation {
 
-	Set<Integer> clientList = new HashSet<Integer>();
-
 	// members
-	private int datagramSocketPort = 1885;
+	private int datagramSocketPort = 25000;
 	private int id = 0;
 	DatagramSocket datagramSocket = null;	
 	boolean runGroupCommuncation = true;	
@@ -37,6 +33,7 @@ public class GroupCommuncation {
 	ChatMessageListener chatMessageListener = null;
 	LeaveMessageListener leaveMessageListener = null;
 	JoinMessageListener joinMessageListener = null;
+	ListMessageListener listMessageListener = null;
 
 	public GroupCommuncation() {
 		id = new Random().nextInt(5000);
@@ -91,17 +88,19 @@ public class GroupCommuncation {
 			else if (message instanceof JoinMessage) {
 				JoinMessage joinMessage = (JoinMessage) message;				
 				if(joinMessageListener != null) {
-					clientList.add(joinMessage.id);
-					System.out.println(clientList.size());
 					joinMessageListener.onIncomingJoinMessage(joinMessage);
 				}
 			}
 			else if (message instanceof LeaveMessage) {
 				LeaveMessage leaveMessage = (LeaveMessage) message;				
 				if(leaveMessageListener != null) {
-					clientList.remove(leaveMessage.id); 
-					System.out.println(clientList.size());
 					leaveMessageListener.onIncomingLeaveMessage(leaveMessage);
+				}
+			}
+			else if (message instanceof ListMessage) {
+				ListMessage listMessage = (ListMessage) message;				
+				if(listMessageListener != null) {
+					listMessageListener.onIncomingListMessage(listMessage);
 				}
 			}
 			else {				
@@ -143,6 +142,17 @@ public class GroupCommuncation {
 		}
 	}
 
+	public void sendListMessage(Set<Integer> clientList) {
+		try {
+			ListMessage listMessage = new ListMessage(clientList);
+			byte[] sendData = messageSerializer.serializeMessage(listMessage);
+			DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, InetAddress.getByName("255.255.255.255"), datagramSocketPort);
+			datagramSocket.send(sendPacket);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
 	public void setChatMessageListener(ChatMessageListener listener) {
 		this.chatMessageListener = listener;		
 	}
@@ -153,6 +163,9 @@ public class GroupCommuncation {
 
 	public void setLeaveMessageListener(LeaveMessageListener listener) {
 		this.leaveMessageListener = listener;		
+	}
+	public void setListMessageListener(ListMessageListener listener) {
+		this.listMessageListener = listener;		
 	}
 	
 }
