@@ -51,7 +51,9 @@ public class WindowProgram implements ActionListener, JoinMessageListener, Leave
 
 	public WindowProgram() {
 		initializeFrame();
-		gc = new GroupCommuncation();	
+		gc = new GroupCommuncation();
+		
+		// set the listeners
 		gc.setChatMessageListener(this);
 		gc.setJoinMessageListener(this);
 		gc.setLeaveMessageListener(this);
@@ -65,6 +67,7 @@ public class WindowProgram implements ActionListener, JoinMessageListener, Leave
 
 		// send a join message to all other clients.
 		gc.sendJoinMessage();
+		gc.sendElectionMessage();
 	}
 
 	private void initializeFrame() {
@@ -74,7 +77,6 @@ public class WindowProgram implements ActionListener, JoinMessageListener, Leave
 		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		frame.getContentPane().setLayout(new GridLayout(0, 1, 0, 0));
 		frame.getContentPane().add(scrollPane);
-
 
 		scrollPane.setViewportView(txtpnChat);
 

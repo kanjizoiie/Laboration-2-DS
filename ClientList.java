@@ -1,5 +1,9 @@
 import java.util.HashSet;
 import java.util.Set;
+
+/**
+ * This handles the clientList for the program.
+ */
 public class ClientList {
     Set<Integer> clientList;
 
@@ -26,7 +30,6 @@ public class ClientList {
         for (Integer e : clientList) {
             System.out.println("List number: " + e);
         }
-        System.out.println();
     }
 
     /**

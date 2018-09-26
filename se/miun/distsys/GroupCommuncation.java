@@ -2,29 +2,40 @@ package se.miun.distsys;
 
 import java.util.Random;
 import java.util.Set;
+import java.io.Console;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.MulticastSocket;
+import java.net.SocketTimeoutException;
 
 import se.miun.distsys.listeners.ChatMessageListener;
+import se.miun.distsys.listeners.ElectionMessageListener;
 import se.miun.distsys.listeners.JoinMessageListener;
 import se.miun.distsys.listeners.LeaveMessageListener;
 import se.miun.distsys.listeners.ListMessageListener;
+import se.miun.distsys.listeners.OKMessageListener;
+
+import se.miun.distsys.messages.Message;
+import se.miun.distsys.messages.MessageSerializer;
 import se.miun.distsys.messages.ChatMessage;
+import se.miun.distsys.messages.CoordinatorMessage;
 import se.miun.distsys.messages.JoinMessage;
 import se.miun.distsys.messages.LeaveMessage;
 import se.miun.distsys.messages.ListMessage;
-import se.miun.distsys.messages.Message;
-import se.miun.distsys.messages.MessageSerializer;
+import se.miun.distsys.messages.ElectionMessage;
+import se.miun.distsys.messages.OKMessage;
+
 
 public class GroupCommuncation {
 
 	// members
 	private int datagramSocketPort = 25000;
 	private int id = 0;
-	DatagramSocket datagramSocket = null;	
-	boolean runGroupCommuncation = true;	
+	private boolean election = false;
+
+	private DatagramSocket datagramSocket = null;	
+	private boolean runGroupCommuncation = true;	
 
 	// serializer
 	MessageSerializer messageSerializer = new MessageSerializer();
@@ -34,16 +45,19 @@ public class GroupCommuncation {
 	LeaveMessageListener leaveMessageListener = null;
 	JoinMessageListener joinMessageListener = null;
 	ListMessageListener listMessageListener = null;
+	ElectionMessageListener electionMessageListener = null;
+	OKMessageListener okMessageListener = null;
 
 	public GroupCommuncation() {
-		id = new Random().nextInt(5000);
+		id = new Random().nextInt(5000000);
 		try {
 			runGroupCommuncation = true;				
 			datagramSocket = new MulticastSocket(datagramSocketPort);		
 			RecieveThread rt = new RecieveThread();
 			rt.start();
 			
-		} catch (Exception e) {
+		}
+		catch (Exception e) {
 			e.printStackTrace();
 		}
 	}
@@ -70,9 +84,16 @@ public class GroupCommuncation {
 				try {
 					datagramSocket.receive(datagramPacket);										
 					byte[] packetData = datagramPacket.getData();					
-					Message recievedMessage = messageSerializer.deserializeMessage(packetData);					
+					Message recievedMessage = messageSerializer.deserializeMessage(packetData);	
+					System.out.println(recievedMessage.getClass());				
 					handleMessage(recievedMessage);
-				} catch (Exception e) {
+					datagramSocket.setSoTimeout(0);
+				}
+				catch (SocketTimeoutException e) {
+					System.out.println("I am the leader");
+					sendCoordinatorMessage();
+				} 
+				catch (Exception e) {
 					e.printStackTrace();
 				}
 			}
@@ -103,54 +124,69 @@ public class GroupCommuncation {
 					listMessageListener.onIncomingListMessage(listMessage);
 				}
 			}
+			else if (message instanceof ElectionMessage) {
+				ElectionMessage electionMessage = (ElectionMessage) message;
+				if (electionMessage.id > id) {
+					sendOKMessage();
+					sendElectionMessage();
+				}
+			}
+			else if (message instanceof OKMessage) {
+				try {
+					datagramSocket.setSoTimeout(0);
+				}
+				catch (Exception e) {
+					e.printStackTrace();
+				}
+			}
 			else {				
 				System.out.println("Unknown message type");
 			}			
 		}		
 	}	
 	
-	public void sendChatMessage(String chat) {
+	public void sendMessage(Message message) {
 		try {
-			ChatMessage chatMessage = new ChatMessage(id, chat);
-			byte[] sendData = messageSerializer.serializeMessage(chatMessage);
+			byte[] sendData = messageSerializer.serializeMessage(message);
 			DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, InetAddress.getByName("255.255.255.255"), datagramSocketPort);
 			datagramSocket.send(sendPacket);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+	}
+
+	public void sendChatMessage(String chat) {
+		sendMessage(new ChatMessage(id, chat));
 	}
 
 	public void sendJoinMessage() {
-		try {
-			JoinMessage joinMessage = new JoinMessage(id);
-			byte[] sendData = messageSerializer.serializeMessage(joinMessage);
-			DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, InetAddress.getByName("255.255.255.255"), datagramSocketPort);
-			datagramSocket.send(sendPacket);
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
+		sendMessage(new JoinMessage(id));
 	}
 
 	public void sendLeaveMessage() {
-		try {
-			LeaveMessage leaveMessage = new LeaveMessage(id);
-			byte[] sendData = messageSerializer.serializeMessage(leaveMessage);
-			DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, InetAddress.getByName("255.255.255.255"), datagramSocketPort);
-			datagramSocket.send(sendPacket);
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
+		sendMessage(new LeaveMessage(id));
 	}
 
 	public void sendListMessage(Set<Integer> clientList) {
-		try {
-			ListMessage listMessage = new ListMessage(clientList);
-			byte[] sendData = messageSerializer.serializeMessage(listMessage);
-			DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, InetAddress.getByName("255.255.255.255"), datagramSocketPort);
-			datagramSocket.send(sendPacket);
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
+		sendMessage(new ListMessage(clientList));
+	}
+
+	public void sendElectionMessage() {
+		sendMessage(new ElectionMessage(id));
+		election = true;
+		datagramSocket.setSoTimeout(4000);
+	}
+
+	public void sendOKMessage() {
+		sendMessage(new OKMessage(id));
+	}
+
+	public void sendCoordinatorMessage() {
+		sendMessage(new CoordinatorMessage(id));
+	}
+
+	public void setElectionMessageListener(ElectionMessageListener listener) {
+		this.electionMessageListener = listener;
 	}
 
 	public void setChatMessageListener(ChatMessageListener listener) {
