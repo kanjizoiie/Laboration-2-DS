@@ -93,7 +93,8 @@ public class WindowProgram implements ActionListener, JoinMessageListener, Leave
 		frame.addWindowListener(new java.awt.event.WindowAdapter() {
 	        public void windowClosing(WindowEvent winEvt) {
 				gc.sendLeaveMessage();
-	            gc.shutdown();
+				gc.shutdown();
+				gc.sendElectionMessage();
 	        }
 	    });
 	}
