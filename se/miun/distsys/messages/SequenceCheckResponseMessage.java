@@ -2,9 +2,9 @@ package se.miun.distsys.messages;
 
 public class SequenceCheckResponseMessage extends Message {
 
-	public boolean run = true;
+	public int sequenceNumber = 0;
 
-	public SequenceCheckResponseMessage(boolean run) {
-		this.run = run;
+	public SequenceCheckResponseMessage(int sequenceNumber) {
+		this.sequenceNumber = sequenceNumber;
 	}
 }

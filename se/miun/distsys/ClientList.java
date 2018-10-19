@@ -1,3 +1,5 @@
+package se.miun.distsys;
+
 import java.util.HashSet;
 import java.util.Set;
 

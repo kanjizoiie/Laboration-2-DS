@@ -2,7 +2,6 @@ import se.miun.distsys.GroupCommuncation;
 import se.miun.distsys.listeners.ChatMessageListener;
 import se.miun.distsys.listeners.JoinMessageListener;
 import se.miun.distsys.listeners.LeaveMessageListener;
-import se.miun.distsys.listeners.ListMessageListener;
 import se.miun.distsys.messages.ChatMessage;
 import se.miun.distsys.messages.JoinMessage;
 import se.miun.distsys.messages.LeaveMessage;
@@ -21,9 +20,9 @@ import javax.swing.JButton;
 import javax.swing.JTextPane;
 import javax.swing.JScrollPane;
 import javax.swing.JList;
-public class WindowProgram implements ActionListener, JoinMessageListener, LeaveMessageListener, ChatMessageListener, ListMessageListener {
+public class WindowProgram implements ActionListener, JoinMessageListener, LeaveMessageListener, ChatMessageListener {
 
-	ClientList clientList = null;
+
 
 	// the main function, this is what is ran on startup.
 	public static void main(String[] args) {
@@ -57,12 +56,7 @@ public class WindowProgram implements ActionListener, JoinMessageListener, Leave
 		gc.setChatMessageListener(this);
 		gc.setJoinMessageListener(this);
 		gc.setLeaveMessageListener(this);
-		gc.setListMessageListener(this);
 		frame.setTitle(Integer.toString(gc.getId()));
-
-		// construct the clientlist
-		clientList = new ClientList();
-
 		System.out.println("Group Communcation Started");
 
 		// send a join message to all other clients.
@@ -119,9 +113,7 @@ public class WindowProgram implements ActionListener, JoinMessageListener, Leave
 	// on incoming join message event function
 	@Override
 	public void onIncomingJoinMessage(JoinMessage joinMessage) {
-		clientList.add(joinMessage.id);
 		if (joinMessage.id != gc.getId()) {
-			gc.sendListMessage(clientList.getClientList());
 			txtpnChat.setText(joinMessage.id + " joined." + "\n" + txtpnChat.getText());	
 		}	
 	}
@@ -129,15 +121,8 @@ public class WindowProgram implements ActionListener, JoinMessageListener, Leave
 	// on incoming leave message event function
 	@Override
 	public void onIncomingLeaveMessage(LeaveMessage leaveMessage) {
-		clientList.remove(leaveMessage.id);
 		if (leaveMessage.id != gc.getId()) {
 			txtpnChat.setText(leaveMessage.id + " left." + "\n" + txtpnChat.getText());	
 		}	
-	}
-
-	@Override
-	public void onIncomingListMessage(ListMessage listMessage) {
-		clientList.setClientList(listMessage.clientList);
-		clientList.printList();
 	}
 }

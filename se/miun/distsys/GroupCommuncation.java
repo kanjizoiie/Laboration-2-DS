@@ -1,5 +1,8 @@
 package se.miun.distsys;
 
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.Timer;
@@ -7,6 +10,7 @@ import java.util.TimerTask;
 import java.io.Console;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.BindException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
@@ -19,7 +23,6 @@ import se.miun.distsys.listeners.ChatMessageListener;
 import se.miun.distsys.listeners.ElectionMessageListener;
 import se.miun.distsys.listeners.JoinMessageListener;
 import se.miun.distsys.listeners.LeaveMessageListener;
-import se.miun.distsys.listeners.ListMessageListener;
 import se.miun.distsys.listeners.OKMessageListener;
 
 import se.miun.distsys.messages.Message;
@@ -37,20 +40,21 @@ import se.miun.distsys.messages.SequenceMessage;
 import se.miun.distsys.messages.SequenceRequestMessage;
 
 
-public class GroupCommuncation {
 
+public class GroupCommuncation {
 	// members
-	private int datagramSocketPort = 25000;
 	private int id = 0;
 	private int coordinator = 0;
-	private boolean electionWaitForVictory = false;
-
+	private boolean TCPAlive = false;
+	private int coordinatorPort = 25001;
 	private ServerSocket coordinatorServer;
-	private int coordinatorPort = 8080;
-
+	private int datagramSocketPort = 25000;
+	private boolean electionState = false;
 	private DatagramSocket datagramSocket = null;
 	private boolean runGroupCommuncation = true;	
-	private boolean TCPAlive = false;
+
+
+	private ClientList clientList = null;
 
 	// TCP server value
 	private int serverSequence = 0;
@@ -59,17 +63,24 @@ public class GroupCommuncation {
 	MessageSerializer messageSerializer = new MessageSerializer();
 	
 	// listeners
-	ChatMessageListener chatMessageListener = null;
-	LeaveMessageListener leaveMessageListener = null;
-	JoinMessageListener joinMessageListener = null;
-	ListMessageListener listMessageListener = null;
 	OKMessageListener okMessageListener = null;
+	ChatMessageListener chatMessageListener = null;
+	JoinMessageListener joinMessageListener = null;
+	LeaveMessageListener leaveMessageListener = null;
 	ElectionMessageListener electionMessageListener = null;
+
 	
+	private Map<Integer, ChatMessage> cMap = null;
+	private Set<Integer> cSet = null;
 
 	public GroupCommuncation() {
 		// generate random id
 		id = new Random().nextInt(123000);
+		// construct the clientlist
+		clientList = new ClientList();
+
+		cMap = new HashMap<Integer, ChatMessage>();
+		
 		// start the communication
 		try {
 			runGroupCommuncation = true;				
@@ -82,25 +93,33 @@ public class GroupCommuncation {
 		}
 	}
 
+
 	class TCPAcceptThread extends Thread {
 		@Override
 		public void run() {
 			while(TCPAlive) {
+				Socket client = null;
+				InputStream in = null;
+				
+				cSet = new HashSet<Integer>(clientList.getClientList());
+
 				try {
-					Socket client = null;
-					if (coordinatorServer != null && !coordinatorServer.isClosed()) {
-						client = coordinatorServer.accept();
-					}
-					InputStream in = client.getInputStream();
+					client = coordinatorServer.accept();
+					in = client.getInputStream();
 					byte[] buffer = new byte[65536];
 					in.read(buffer);
 					Message recievedMessage = messageSerializer.deserializeMessage(buffer);
 					System.out.println("Receive on TCP: " + recievedMessage.getClass());	
 					HandleTCPMessage(recievedMessage, client);
+					client.close();
+				}
+				catch(SocketTimeoutException e) {
+					
 				}
 				catch (Exception e) {
 					e.printStackTrace();
 				}
+
 			}
 		}
 	}
@@ -108,10 +127,17 @@ public class GroupCommuncation {
 	public void HandleTCPMessage(Message message, Socket client) {
 		if (message instanceof SequenceCheckMessage) {
 			SequenceCheckMessage sequenceCheckMessage = (SequenceCheckMessage) message;
-			SendTCPMessage(client, new SequenceCheckResponseMessage(sequenceCheckMessage.sequenceNumber == serverSequence));
+			cSet.remove(sequenceCheckMessage.id);
+			SendTCPMessage(client, new SequenceCheckResponseMessage(sequenceCheckMessage.sequenceNumber));
 		}
 		else if (message instanceof SequenceRequestMessage) {
+			Set<Integer> cSet = clientList.getClientList();
 			SendTCPMessage(client, new SequenceMessage(++serverSequence));
+			try {
+				coordinatorServer.setSoTimeout(3000);
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
 		}
 		else {				
 			System.out.println("Unknown message type");
@@ -119,6 +145,7 @@ public class GroupCommuncation {
 	}
 
 	public void SendTCPMessage(Socket socket, Message message) {
+		System.out.println("Sent on TCP: " + message.getClass());	
 		try {
 			// open output stream
 			OutputStream out = socket.getOutputStream();
@@ -157,20 +184,28 @@ public class GroupCommuncation {
 					handleMessage(recievedMessage);
 				}
 				catch (SocketTimeoutException e) { // Handle timeout from socket
-					sendCoordinatorMessage();
+					sendCoordinatorMessage(); // Send the coordinator message where it tells everyone he has won.
 					try {
 						// Reset timeout to infinite
 						datagramSocket.setSoTimeout(0);
-						TCPAlive = true;
-						if (coordinatorServer == null || coordinatorServer.isClosed()) {
-							coordinatorServer = new ServerSocket(coordinatorPort);
-						}
-						TCPAcceptThread rt = new TCPAcceptThread();
-						rt.start();
 					}
 					catch (Exception ie) {
 						ie.printStackTrace();
 					}
+
+					try {
+						coordinatorServer = new ServerSocket(coordinatorPort);
+					} catch (BindException bException) {
+						bException.printStackTrace();
+					}
+					catch (Exception ei) {
+						ei.printStackTrace();
+					}
+
+					TCPAlive = true;
+					TCPAcceptThread rt = new TCPAcceptThread(); // Start TCPAcceptThread
+					rt.start();
+
 				} 
 				catch (Exception e) {
 					e.printStackTrace();
@@ -178,74 +213,79 @@ public class GroupCommuncation {
 			}
 		}
 
-		
-	
+
 
 		private void handleMessage(Message message) {
 			if(message instanceof ChatMessage) {				
-				ChatMessage chatMessage = (ChatMessage) message;				
+				ChatMessage chatMessage = (ChatMessage) message;
+				cMap.put(chatMessage.sequence, chatMessage);
+
 				if(chatMessageListener != null) {
-					if (checkSequenceMessage(chatMessage.sequence)) {
-						chatMessageListener.onIncomingChatMessage(chatMessage);
-					}
+					chatMessageListener.onIncomingChatMessage(cMap.get(checkSequenceMessage(chatMessage.sequence)));
 				}
 			} 
 			else if (message instanceof JoinMessage) {
 				JoinMessage joinMessage = (JoinMessage) message;				
 				if(joinMessageListener != null) {
 					joinMessageListener.onIncomingJoinMessage(joinMessage);
+					clientList.add(joinMessage.id);
+					if (joinMessage.id != id) {
+						sendListMessage(clientList.getClientList());
+					}
 				}
 			}
 			else if (message instanceof LeaveMessage) {
 				LeaveMessage leaveMessage = (LeaveMessage) message;				
 				if(leaveMessageListener != null) {
+					clientList.remove(leaveMessage.id);
 					leaveMessageListener.onIncomingLeaveMessage(leaveMessage);
 				}
 			}
 			else if (message instanceof ListMessage) {
-				ListMessage listMessage = (ListMessage) message;				
-				if(listMessageListener != null) {
-					listMessageListener.onIncomingListMessage(listMessage);
+				ListMessage listMessage = (ListMessage) message;
+				if (listMessage.id != id) {
+					clientList.setClientList(listMessage.clientList);
+					clientList.printList();
 				}
 			}
 			else if (message instanceof ElectionMessage) {
 				ElectionMessage electionMessage = (ElectionMessage) message;
-				System.out.println("ID: " + id + " ELE RECV: " + electionMessage.id); //DEBUG
-				if (electionMessage.id != id && !electionWaitForVictory) {
+				// System.out.println("ID: " + id + " ELE RECV: " + electionMessage.id); //DEBUG
+				if (electionMessage.id != id && !electionState) {
 					sendElectionMessage();
 				}
-				if (id > electionMessage.id) {
+				if (electionMessage.id < id) {
 					sendOKMessage(electionMessage.id);
 				}
 			}
 			else if (message instanceof OKMessage) {
 				OKMessage okMessage = (OKMessage) message;
-				System.out.println("ID: " + id + " OKM RECV: " + okMessage.id); //DEBUG
-				if (id == okMessage.id) {
+				if (okMessage.id == id) {
+					// System.out.println("ID: " + id + " OKM RECV: " + okMessage.id); //DEBUG
+					electionState = true;
 					try {
 						datagramSocket.setSoTimeout(0);
 					}
 					catch (Exception e) {
 						e.printStackTrace();
 					}
-					electionWaitForVictory = true;
 				}
 			}
 			else if (message instanceof CoordinatorMessage) {
 				CoordinatorMessage coordinatorMessage = (CoordinatorMessage) message;
 				System.out.println("The coordinator is: " + coordinatorMessage.id);
 				coordinator = coordinatorMessage.id;
+				electionState = false;
 				if (coordinatorMessage.id != id) {
+					TCPAlive = false;
 					try {
-						if (coordinatorServer != null && !coordinatorServer.isClosed()) {
-							TCPAlive = false;
-							coordinatorServer.close();
-						}
+						coordinatorServer.close();
 					}
 					catch (Exception e) {
 						e.printStackTrace();
 					}
 				}
+				
 			}
 			else {				
 				System.out.println("Unknown message type");
@@ -294,8 +334,9 @@ public class GroupCommuncation {
 		return -1;
 	}
 
-	public boolean checkSequenceMessage(int checkSequence) {
+	public int checkSequenceMessage(int checkSequence) {
 		Socket server = null;
+		InputStream in = null;
 		try {
 			server = new Socket("localhost", coordinatorPort);
 		}
@@ -312,29 +353,43 @@ public class GroupCommuncation {
 
 		try {
 			// Send SEQUENCE CHECK message
-			SendTCPMessage(server, new SequenceCheckMessage(checkSequence));
-
-			// Open read stream
-			InputStream in = server.getInputStream();
-			in.read(buffer);
-
-			// Deserialize message
-			Message recievedMessage = messageSerializer.deserializeMessage(buffer);	
-
-			// Print the recieved boolean value
-			System.out.println("Receive: " + ((SequenceCheckResponseMessage)recievedMessage).run);
-
-			// Close the connection
-			server.close();
-
-			// Return if message correct order
-			return ((SequenceCheckResponseMessage)recievedMessage).run;
+			SendTCPMessage(server, new SequenceCheckMessage(id, checkSequence));
 		}
 		catch (Exception e) {
 			e.printStackTrace();
 		}
-		// On error return false
-		return false;
+
+
+		try {
+			// Open read stream
+			in = server.getInputStream();
+		}
+		catch (Exception e) {
+			e.printStackTrace();
+		}
+
+
+		try {
+			in.read(buffer);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+		// Deserialize message
+		Message recievedMessage = messageSerializer.deserializeMessage(buffer);	
+
+		// Print the recieved boolean value
+		System.out.println("Receive from sequence check: " + ((SequenceCheckResponseMessage)recievedMessage).sequenceNumber);
+
+		try {
+			// Close the connection
+			server.close();
+		} catch (Exception e) {
+			//TODO: handle exception
+		}
+
+		// Return if message correct order
+		return ((SequenceCheckResponseMessage)recievedMessage).sequenceNumber;
 	}
 
 	public void sendMessage(Message message) {
@@ -361,17 +416,17 @@ public class GroupCommuncation {
 	}
 
 	public void sendListMessage(Set<Integer> clientList) {
-		sendMessage(new ListMessage(clientList));
+		sendMessage(new ListMessage(id, clientList));
 	}
 
 	public void sendElectionMessage() {
+		sendMessage(new ElectionMessage(id));
 		try {
-			datagramSocket.setSoTimeout(6000);
+			datagramSocket.setSoTimeout(3000);
 		}
 		catch (Exception e) {
 			e.printStackTrace();
 		}
-		sendMessage(new ElectionMessage(id));
 	}
 
 	public void sendOKMessage(int id) {
@@ -397,8 +452,4 @@ public class GroupCommuncation {
 	public void setLeaveMessageListener(LeaveMessageListener listener) {
 		this.leaveMessageListener = listener;		
 	}
-	public void setListMessageListener(ListMessageListener listener) {
-		this.listMessageListener = listener;		
-	}
-	
 }
