@@ -1,4 +1,4 @@
 # Laboration-2-DS
 
-Threaded total ordering
-Bully algorithm (not completely working)
+1. Threaded total ordering
+2. Bully algorithm (not completely working)
