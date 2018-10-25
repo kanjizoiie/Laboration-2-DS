@@ -71,7 +71,7 @@ public class GroupCommuncation {
 
 	
 	private Map<Integer, ChatMessage> cMap = null;
-	private Set<Integer> cSet = null;
+	private Map<Integer, Set<Integer>> seqMap = null;
 
 	public GroupCommuncation() {
 		// generate random id
@@ -80,6 +80,7 @@ public class GroupCommuncation {
 		clientList = new ClientList();
 
 		cMap = new HashMap<Integer, ChatMessage>();
+		seqMap = new HashMap<Integer, Set<Integer>>();
 		
 		// start the communication
 		try {
@@ -100,8 +101,6 @@ public class GroupCommuncation {
 			while(TCPAlive) {
 				Socket client = null;
 				InputStream in = null;
-				
-				cSet = new HashSet<Integer>(clientList.getClientList());
 
 				try {
 					client = coordinatorServer.accept();
@@ -113,9 +112,6 @@ public class GroupCommuncation {
 					HandleTCPMessage(recievedMessage, client);
 					client.close();
 				}
-				catch(SocketTimeoutException e) {
-					
-				}
 				catch (Exception e) {
 					e.printStackTrace();
 				}
@@ -124,20 +120,35 @@ public class GroupCommuncation {
 		}
 	}
 
+	class SequenceCheckThread extends Thread {
+		private int sequenceNumber = 0;
+		private Socket client = null;
+		
+		SequenceCheckThread(Socket client, int sequenceNumber) {
+			this.client = client;
+			this.sequenceNumber = sequenceNumber;
+		}
+
+		@Override
+		public void run() {
+			while (!seqMap.get(sequenceNumber).isEmpty());
+			//SendTCPMessage(client, new SequenceCheckResponseMessage(sequenceNumber));
+			System.out.println("SHOULD SEND NAO");
+			seqMap.remove(sequenceNumber);
+		}
+	}
+
 	public void HandleTCPMessage(Message message, Socket client) {
 		if (message instanceof SequenceCheckMessage) {
 			SequenceCheckMessage sequenceCheckMessage = (SequenceCheckMessage) message;
-			cSet.remove(sequenceCheckMessage.id);
-			SendTCPMessage(client, new SequenceCheckResponseMessage(sequenceCheckMessage.sequenceNumber));
+			seqMap.get(sequenceCheckMessage.sequenceNumber).remove(sequenceCheckMessage.id);
 		}
 		else if (message instanceof SequenceRequestMessage) {
-			Set<Integer> cSet = clientList.getClientList();
-			SendTCPMessage(client, new SequenceMessage(++serverSequence));
-			try {
-				coordinatorServer.setSoTimeout(3000);
-			} catch (Exception e) {
-				e.printStackTrace();
-			}
+			seqMap.put(serverSequence, new HashSet<Integer>(clientList.getClientList()));
+			SequenceCheckThread sequenceCheckThread = new SequenceCheckThread(client, serverSequence);
+			sequenceCheckThread.start();
+			SendTCPMessage(client, new SequenceMessage(serverSequence));
+			serverSequence += 1;
 		}
 		else {				
 			System.out.println("Unknown message type");
