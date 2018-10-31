@@ -8,6 +8,7 @@ import java.util.Random;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.BindException;
+import java.net.ConnectException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
@@ -128,7 +129,6 @@ public class GroupCommuncation {
     }
 
     class TCPAcceptThread extends Thread {
-
         @Override
         public void run() {
             while (TCPAlive) {
@@ -345,14 +345,21 @@ public class GroupCommuncation {
         Socket server = null;
         try {
             server = new Socket("localhost", coordinatorPort);
-        } catch (Exception e) {
+        }
+        catch (ConnectException e) {
+            clientList.remove(coordinator);
+            sendListMessage(clientList.getClientList());
+            sendElectionMessage();
+        }
+        catch (Exception e) {
             e.printStackTrace();
         } finally {
-            if (server.isConnected()) {
+            if (server != null && server.isConnected()) {
                 System.out.println("Server connected: " + server.getInetAddress());
+                return server;
             }
         }
-        return server;
+        return null;
     }
 
     // Send TCP message to get the sequence number.
@@ -363,62 +370,67 @@ public class GroupCommuncation {
         Message recievedMessage = null;
         byte[] buffer = new byte[65536];
 
-        try {
-            // Send SEQUENCE REQUEST message
-            SendTCPMessage(server, new SequenceRequestMessage());
-        } catch (Exception e) {
-            e.printStackTrace();
+        if (server != null) {
+            try {
+                // Send SEQUENCE REQUEST message
+                SendTCPMessage(server, new SequenceRequestMessage());
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+    
+            try {
+                in = server.getInputStream();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+    
+            try {
+                // Open read stream
+                in.read(buffer);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+    
+            try {
+                // Deserialize message
+                recievedMessage = messageSerializer.deserializeMessage(buffer);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+    
+            // Print the recieved sequence number
+            System.out.println("Receive: " + ((SequenceMessage) recievedMessage).sequenceNumber);
+    
+            try {
+                // Close the connection
+                server.close();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            // Return the sequence number
+            return ((SequenceMessage) recievedMessage).sequenceNumber;
         }
-
-        try {
-            in = server.getInputStream();
-        } catch (Exception e) {
-            e.printStackTrace();
+        else {
+            return -1;
         }
-
-        try {
-            // Open read stream
-            in.read(buffer);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
-        try {
-            // Deserialize message
-            recievedMessage = messageSerializer.deserializeMessage(buffer);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
-        // Print the recieved sequence number
-        System.out.println("Receive: " + ((SequenceMessage) recievedMessage).sequenceNumber);
-
-        try {
-            // Close the connection
-            server.close();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
-        // Return the sequence number
-        return ((SequenceMessage) recievedMessage).sequenceNumber;
     }
 
     public void checkSequenceNumber(int sequence) {
         Socket server = connectToServer();
-        try {
-            // Send SEQUENCE CHECK message
-            SendTCPMessage(server, new SequenceCheckMessage(id, sequence));
-        } catch (Exception e) {
-            e.printStackTrace();
+        if (server != null) {
+            try {
+                // Send SEQUENCE CHECK message
+                SendTCPMessage(server, new SequenceCheckMessage(id, sequence));
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            try {
+                // Close the connection
+                server.close();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
-        try {
-            // Close the connection
-            server.close();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
     }
 
     // SendMessage class that serializes message and creates a datagram packet which then is sent on the multicast socket.
@@ -440,7 +452,13 @@ public class GroupCommuncation {
 
     // Send ChatMessage
     public void sendChatMessage(String chat) {
-        sendMessage(new ChatMessage(id, getSequenceNumber(), chat));
+        int sequence = getSequenceNumber();
+        if (sequence != -1) {
+            sendMessage(new ChatMessage(id, sequence, chat));
+        }
+        else {
+            System.out.println("Something went wrong while sending the chat message!");
+        }
     }
 
     // Send JoinMessage

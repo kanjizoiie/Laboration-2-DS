@@ -21,7 +21,7 @@ import javax.swing.JTextPane;
 import javax.swing.JScrollPane;
 import javax.swing.JList;
 
-public class WindowProgram implements ActionListener, JoinMessageListener, LeaveMessageListener, ChatMessageListener, KeyListener {
+public class WindowProgram implements ActionListener, JoinMessageListener, LeaveMessageListener, ChatMessageListener {
 
     // the main function, this is what is ran on startup.
     public static void main(String[] args) {
@@ -100,14 +100,6 @@ public class WindowProgram implements ActionListener, JoinMessageListener, Leave
                 gc.sendChatMessage(txtpnMessage.getText());
                 txtpnMessage.setText("");
             }
-        }
-    }
-
-    @Override
-    public void keyPressed(KeyEvent e) {
-        if (e.getKeyCode()==KeyEvent.VK_ENTER){
-            gc.sendChatMessage(txtpnMessage.getText());
-            txtpnMessage.setText("");
         }
     }
 
