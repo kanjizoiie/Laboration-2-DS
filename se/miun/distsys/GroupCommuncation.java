@@ -303,7 +303,8 @@ public class GroupCommuncation {
                     } catch (Exception e) {
                         e.printStackTrace();
                     }
-                } else {
+                } 
+                else {
                       if (coordinatorServer == null || coordinatorServer.isClosed()) {
                         // Start the server
                         try {
