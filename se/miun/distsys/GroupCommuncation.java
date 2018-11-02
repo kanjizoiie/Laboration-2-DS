@@ -298,11 +298,14 @@ public class GroupCommuncation {
 
                 if (coordinatorMessage.id != id) {
                     TCPAlive = false;
-                    try {
-                        coordinatorServer.close();
-                    } catch (Exception e) {
-                        e.printStackTrace();
+                    if (coordinatorServer != null && !coordinatorServer.isClosed()) {
+                        try {
+                            coordinatorServer.close();
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
                     }
+
                 } 
                 else {
                       if (coordinatorServer == null || coordinatorServer.isClosed()) {
